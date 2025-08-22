@@ -1,0 +1,37 @@
+# Set execution policy for the current process
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
+
+# Define paths
+$source = "\\*shared location*\apps\Excel\CoolStuff.xlam"
+$xlstart = "$env:APPDATA\Microsoft\Excel\XLSTART"
+$destination = Join-Path -Path $xlstart -ChildPath "CoolStuff.xlam"
+
+# Ensure XLSTART exists
+if (!(Test-Path -Path $xlstart)) {
+    New-Item -ItemType Directory -Path $xlstart -Force | Out-Null
+}
+
+# Copy the add-in silently
+if (Test-Path -Path $source) {
+    Copy-Item -Path $source -Destination $destination -Force -ErrorAction SilentlyContinue
+}
+
+# Register the add-in in the registry
+$addinName = "CoolStuff"
+$addinPath = $destination.Replace('\', '\\')  # Escape backslashes for registry
+
+# Registry path for Excel add-ins (current user)
+$regPath = "HKCU:\Software\Microsoft\Office\Excel\Addins\$addinName"
+
+# Create registry keys and values
+New-Item -Path $regPath -Force | Out-Null
+Set-ItemProperty -Path $regPath -Name "FriendlyName" -Value $addinName
+Set-ItemProperty -Path $regPath -Name "Description" -Value "Custom Excel Add-in"
+Set-ItemProperty -Path $regPath -Name "LoadBehavior" -Value 3  # Load at startup
+
+# Optional: Add to trusted locations (to avoid macro warnings)
+$trustPath = "HKCU:\Software\Microsoft\Office\16.0\Excel\Security\Trusted Locations\Location99"
+New-Item -Path $trustPath -Force | Out-Null
+Set-ItemProperty -Path $trustPath -Name "Path" -Value "$xlstart\"
+Set-ItemProperty -Path $trustPath -Name "AllowSubfolders" -Value 1
+Set-ItemProperty -Path $trustPath -Name "Description" -Value "XLSTART Add-ins"
